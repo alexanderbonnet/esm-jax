@@ -1,10 +1,15 @@
+import dataclasses
+import pathlib
+
 import einops
 import equinox as eqx
 import equinox.nn as nn
 import jax
 import jax.numpy as jnp
 import jax.random as jr
-from jaxtyping import Array, Float, PRNGKeyArray
+from jaxtyping import Array, Float, Int, PRNGKeyArray
+
+from esmjax import _constants
 
 
 def gelu(x: Float[Array, " ..."]) -> Float[Array, " ..."]:
@@ -52,7 +57,9 @@ class MultiHeadAttention(eqx.Module):
         self.value = nn.Linear(dim, dim, key=key3)
         self.output = nn.Linear(dim, dim, key=key4)
 
-    def __call__(self, seq: Float[Array, "seq dim"], mask: Float[Array, " seq"]) -> None:
+    def __call__(
+        self, seq: Float[Array, "seq dim"], mask: Float[Array, " seq"]
+    ) -> Float[Array, "seq dim"]:
         seq = jax.vmap(self.layer_norm)(seq)
 
         query, key, value = map(lambda x: jax.vmap(x)(seq), (self.query, self.key, self.value))
@@ -152,10 +159,18 @@ class ESM2(eqx.Module):
         self.layer_norm = nn.LayerNorm(dim)
 
     def __call__(
-        self, seq: Float[Array, " seq"], mask: Float[Array, " seq"]
+        self, tokens: Int[Array, " seq"], mask: Float[Array, " seq"]
     ) -> tuple[Float[Array, "seq vocab"], Float[Array, "seq dim"]]:
-        emb = jax.vmap(self.embedding)(seq)
+        emb = jax.vmap(self.embedding)(tokens)
         for layer in self.layers:
             emb = layer(emb, mask)
         emb = jax.vmap(self.layer_norm)(emb)
         return self.lm_head(emb), emb
+
+    @classmethod
+    def from_pretrained(cls, name: str, *, key: PRNGKeyArray) -> "ESM2":
+        config = _constants.MODEL_HYPERPARAMS[name]
+        model = cls(**dataclasses.asdict(config), key=key)
+
+        weights = pathlib.Path(__file__).parent.parent / "data" / "weights" / f"{name}.eqx"
+        return eqx.tree_deserialise_leaves(path_or_file=weights, like=model)

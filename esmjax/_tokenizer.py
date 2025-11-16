@@ -14,7 +14,7 @@ def _load_vocab() -> dict[str, int]:
 VOCAB: Final[dict[str, int]] = _load_vocab()
 
 
-def tokenize(sequence: list[str]) -> Int[Array, " n"]:
+def tokenize(sequence: str) -> Int[Array, " n"]:
     tokens = (
         [VOCAB["<cls>"]] + [VOCAB.get(char, VOCAB["<unk>"]) for char in sequence] + [VOCAB["<eos>"]]
     )

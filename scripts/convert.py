@@ -10,7 +10,7 @@ import jax.random as jr
 import torch
 from transformers import AutoModelForMaskedLM
 
-from esmjax import _constants, _model
+import esmjax
 
 parent = Path(__file__).parent
 
@@ -27,7 +27,7 @@ def build_conversion_map(name: str) -> dict:
         "layer_norm.weight": "esm.encoder.emb_layer_norm_after.weight",
         "layer_norm.bias": "esm.encoder.emb_layer_norm_after.bias",
     }
-    for k in range(_constants.MODEL_HYPERPARAMS[name].num_layers):
+    for k in range(esmjax.MODEL_HYPERPARAMS[name].num_layers):
         conversion_map.update(
             {
                 f"layers.[{k}].attention.query.weight": f"esm.encoder.layer.{k}.attention.self.query.weight",
@@ -87,7 +87,7 @@ def main(name: str, eqx_path: str | Path | None = None) -> None:
     eqx_path.parent.mkdir(parents=True, exist_ok=True)
 
     state_dict = AutoModelForMaskedLM.from_pretrained("facebook/" + name).state_dict()
-    model = _model.ESM2(**dataclasses.asdict(_constants.MODEL_HYPERPARAMS[name]), key=jr.PRNGKey(0))
+    model = esmjax.ESM2(**dataclasses.asdict(esmjax.MODEL_HYPERPARAMS[name]), key=jr.PRNGKey(0))
     conversion_map = build_conversion_map(name)
     updated_model = update_eqx_with_state_dict(model, state_dict, conversion_map)
     eqx.tree_serialise_leaves(eqx_path, updated_model)
