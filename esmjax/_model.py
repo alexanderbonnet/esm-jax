@@ -27,9 +27,9 @@ def rotate_half_jax(x: Float[Array, "head dim"]) -> Float[Array, "head dim"]:
 
 
 def apply_rotary_pos_emb_jax(
-    x: Float[Array, "head seq dim"], sin: Float[Array, "seq dim"], cos: Float[Array, "seq dim"]
-) -> Float[Array, "head seq dim"]:
-    return (x * cos[None, :, :]) + (rotate_half_jax(x) * sin[None, :, :])
+    x: Float[Array, "seq head dim"], sin: Float[Array, "seq dim"], cos: Float[Array, "seq dim"]
+) -> Float[Array, "seq head dim"]:
+    return (x * cos[:, None, :]) + (rotate_half_jax(x) * sin[:, None, :])
 
 
 class MultiHeadAttention(eqx.Module):
@@ -53,31 +53,19 @@ class MultiHeadAttention(eqx.Module):
         self.output = nn.Linear(dim, dim, key=key4)
 
     def __call__(self, seq: Float[Array, "seq dim"], mask: Float[Array, " seq"]) -> None:
-        n, _ = seq.shape
-
         seq = jax.vmap(self.layer_norm)(seq)
 
-        query = jax.vmap(self.query)(seq)
-        key = jax.vmap(self.key)(seq)
-        value = jax.vmap(self.value)(seq)
+        query, key, value = map(lambda x: jax.vmap(x)(seq), (self.query, self.key, self.value))
+        query, key, value = map(
+            lambda x: einops.rearrange(x, "seq (head dim) -> seq head dim", dim=self.head_dim),
+            (query, key, value),
+        )
 
-        pattern = "seq (head dim) -> head seq dim"
-        query = einops.rearrange(query, pattern, dim=self.head_dim)
-        key = einops.rearrange(key, pattern, dim=self.head_dim)
-        value = einops.rearrange(value, pattern, dim=self.head_dim)
+        sin, cos = fixed_pos_embedding_jax(dim=self.head_dim, n=seq.shape[0])
+        query, key = map(lambda x: apply_rotary_pos_emb_jax(x, sin, cos), (query, key))
 
-        sin, cos = fixed_pos_embedding_jax(dim=self.head_dim, n=n)
-        query = apply_rotary_pos_emb_jax(query, sin, cos)
-        key = apply_rotary_pos_emb_jax(key, sin, cos)
-
-        mask = -jnp.inf * ~jnp.einsum("i,j->ij", mask, mask)
-
-        # NOTE: replace with jax.nn.dot_product_attention
-        attention = jnp.einsum("hik,hjk->hij", query, key) / jnp.sqrt(self.head_dim)
-        attention = jax.nn.softmax(attention + mask[None, :, :], axis=-1)
-
-        out = jnp.einsum("hij,hjk->hik", attention, value)
-        out = einops.rearrange(out, "head seq dim -> seq (head dim)")
+        out = jax.nn.dot_product_attention(query=query, key=key, value=value, mask=mask)
+        out = einops.rearrange(out, "seq head dim -> seq (head dim)")
         return jax.vmap(self.output)(out)
 
 
