@@ -9,7 +9,15 @@ dependencies = [
     "equinox>=0.13.2",
     "jax>=0.8.0",
     "jaxtyping>=0.3.3",
+    "loguru>=0.7.3",
+    "torch>=2.9.1",         # convert weights from torch models
+    "transformers>=4.57.1", # convert weights from torch models
 ]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
 
 [tool.ruff]
 line-length = 100
@@ -23,5 +31,4 @@ extend-ignore = [
 ]
 
 [dependency-groups]
-convert = ["fire>=0.7.1", "transformers>=4.57.1"]
 dev = ["ipykernel>=7.1.0", "mypy>=1.18.2", "pytest>=9.0.1", "ruff>=0.14.5"]
