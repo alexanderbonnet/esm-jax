@@ -7,17 +7,7 @@ Dependencies are managed with `uv`.
 
 ## Example
 
-### Converting weights
-
-First, **weights need to be converted from torch to jax**, the converted weights will appear in the `data/weights` directory under `<model name>.eqx`.
-
-Run `uv sync --group convert` to make sure to install the `transformers` package that we'll use to get the torch weights.
-
-```bash
-uv run python -m scripts.convert --name esm2_t30_150M_UR50D
-```
-
-The model name could be any of the following:
+The model name can be any of the following.
 
 | name                |
 | ------------------- |
@@ -28,20 +18,19 @@ The model name could be any of the following:
 | esm2_t12_35M_UR50D  |
 | esm2_t6_8M_UR50D    |
 
-### Inference
+On the first run with the model, weights will be downloaded from hugging face using [`transformers`](https://github.com/huggingface/transformers). The checkpoints (converted to Jax/Equinox) will be cached in the `data/weights` directory.
 
 ```python
 import jax.random as jr
 
-import esmjax
+from esmjax import esm2
 
-key = jr.PRNGKey(43)
-model = esmjax.ESM2.from_pretrained("esm2_t30_150M_UR50D", key=key)
+model = esm2.ESM2.from_pretrained("esm2_t30_150M_UR50D", key=jr.PRNGKey(43))
 
 sequence = "MGSSHHHHHHSSGLVPAGSHMEEKQILCVGLVVLDIINVVDKYPEEDTDRRCLSQRWQRGGNASNSCTVLSLLGARCAFMGSLAPGHVADFVLDDLRQHSVDLRYVVLQTEGSIPTSTVIINEASGSRTILHAYRNLPDVSAKDFEKVDLTRFKWIHIEGRNASEQVKMLQRIEEHNAKQPLPQKVRVSVEIEKPREELFQLFSYGEVVFVSKDVAKHLGFQSAVEALRGLYSRVKKGATLVCAWAEEGADALGPDGQLLHSDAFPPPRVVDTLGAGDTFNASVIFSLSKGNSMQEALRFGCQVAGKKCGLQGFDGIV"
 
-tokens = esmjax.tokenize(sequence)
-tokens, mask = esmjax.pad_and_mask(tokens, pad_length=16) # in case you need to pad or mask
+tokens = esm2.tokenize(sequence)
+tokens, mask = esm2.pad_and_mask(tokens, pad_length=16) # in case you need to pad or mask
 
 logits, embedding = model(tokens=tokens, mask=mask)
 
