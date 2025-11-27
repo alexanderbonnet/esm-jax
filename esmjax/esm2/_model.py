@@ -26,24 +26,22 @@ def gelu(x: Float[Array, " ..."]) -> Float[Array, " ..."]:
     return x * 0.5 * (1.0 + jax.lax.erf(x / jnp.sqrt(2.0)))
 
 
-def fixed_pos_embedding_jax(
-    dim: int, n: int
-) -> tuple[Float[Array, " seq dim"], Float[Array, " seq dim"]]:
+def fixed_pos_embedding(n: int, dim: int) -> tuple[Float[Array, " n dim"], Float[Array, " n dim"]]:
     inv_freq = 1.0 / (10000 ** (jnp.arange(0, dim, 2) / dim))
     frequencies = jnp.einsum("i,j->ij", jnp.arange(n), inv_freq)
     emb = jnp.concatenate([frequencies, frequencies], axis=-1)
     return jnp.sin(emb), jnp.cos(emb)
 
 
-def rotate_half_jax(x: Float[Array, "head dim"]) -> Float[Array, "head dim"]:
+def rotate_half(x: Float[Array, "head dim"]) -> Float[Array, "head dim"]:
     x1, x2 = jnp.split(x, 2, axis=-1)
     return jnp.concat((-x2, x1), axis=-1)
 
 
-def apply_rotary_pos_emb_jax(
+def apply_rotary_pos_emb(
     x: Float[Array, "seq head dim"], sin: Float[Array, "seq dim"], cos: Float[Array, "seq dim"]
 ) -> Float[Array, "seq head dim"]:
-    return (x * cos[:, None, :]) + (rotate_half_jax(x) * sin[:, None, :])
+    return (x * cos[:, None, :]) + (rotate_half(x) * sin[:, None, :])
 
 
 class MultiHeadAttention(eqx.Module):
@@ -77,8 +75,8 @@ class MultiHeadAttention(eqx.Module):
             (query, key, value),
         )
 
-        sin, cos = fixed_pos_embedding_jax(dim=self.head_dim, n=seq.shape[0])
-        query, key = map(lambda x: apply_rotary_pos_emb_jax(x, sin, cos), (query, key))
+        sin, cos = fixed_pos_embedding(dim=self.head_dim, n=seq.shape[0])
+        query, key = map(lambda x: apply_rotary_pos_emb(x, sin, cos), (query, key))
 
         out = jax.nn.dot_product_attention(query=query, key=key, value=value, mask=mask)
         out = einops.rearrange(out, "seq head dim -> seq (head dim)")
