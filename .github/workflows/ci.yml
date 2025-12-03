@@ -33,7 +33,7 @@ jobs:
         run: uv run ruff format --check esmjax tests
 
       - name: Type check
-        run: uv run mypy esmjax tests
+        run: uv run ty check esmjax tests
 
       - name: Run tests
         run: uv run pytest tests
