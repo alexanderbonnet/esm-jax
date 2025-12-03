@@ -3,6 +3,9 @@
 Jax implementation of the esm2 protein language model, inference only. The outputs
 were verified against the available models on hugging face.
 
+The model differs slightly from the hugging face version as I have removed
+token dropout from inference.
+
 Dependencies are managed with `uv`.
 
 ## Example
@@ -25,7 +28,7 @@ import jax.random as jr
 
 from esmjax import esm2
 
-model = esm2.ESM2.from_pretrained("esm2_t30_150M_UR50D", key=jr.PRNGKey(43))
+model = esm2.ESM2.from_pretrained("esm2_t30_150M_UR50D")
 
 sequence = "MGSSHHHHHHSSGLVPAGSHMEEKQILCVGLVVLDIINVVDKYPEEDTDRRCLSQRWQRGGNASNSCTVLSLLGARCAFMGSLAPGHVADFVLDDLRQHSVDLRYVVLQTEGSIPTSTVIINEASGSRTILHAYRNLPDVSAKDFEKVDLTRFKWIHIEGRNASEQVKMLQRIEEHNAKQPLPQKVRVSVEIEKPREELFQLFSYGEVVFVSKDVAKHLGFQSAVEALRGLYSRVKKGATLVCAWAEEGADALGPDGQLLHSDAFPPPRVVDTLGAGDTFNASVIFSLSKGNSMQEALRFGCQVAGKKCGLQGFDGIV"
 

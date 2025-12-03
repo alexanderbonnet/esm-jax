@@ -192,7 +192,7 @@ class ESM2(eqx.Module):
         return self.lm_head(emb), emb
 
     @classmethod
-    def from_pretrained(cls, name: str, *, key: PRNGKeyArray) -> "ESM2":
+    def from_pretrained(cls, name: str) -> "ESM2":
         weights_path = get_weights_path(name)
         if not weights_path.is_file():
             loguru.logger.info(
@@ -201,6 +201,9 @@ class ESM2(eqx.Module):
             )
             convert_weights_from_torch(name)
 
+        # The seed is not important here as there is no stochasticity at runtime.
+        # It is only needed to initialize the model before the weights get loaded.
+        key = jr.PRNGKey(seed=43)
         config = MODEL_HYPERPARAMS[name]
         model = cls(**config, key=key)
 
