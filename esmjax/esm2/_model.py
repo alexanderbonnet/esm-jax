@@ -210,7 +210,7 @@ class ESM2(eqx.Module):
 WEIGHTS_DIR = Path(__file__).parent.parent.parent / "data" / "weights"
 
 
-def build_conversion_map(num_layers: int) -> tuple[dict[str, str], dict[str, str]]:
+def build_conversion_map(num_layers: int) -> dict[str, str]:
     conversion_map = {
         "embedding.weight": "esm.embeddings.word_embeddings.weight",
         "lm_head.bias": "lm_head.bias",
