@@ -153,7 +153,7 @@ class RobertaLMHead(eqx.Module):
 @jaxtyped(typechecker=beartype)
 class ESM2(eqx.Module):
     embedding: nn.Embedding
-    transformer: TransformerLayer
+    layers: list[TransformerLayer]
     lm_head: RobertaLMHead
     layer_norm: nn.LayerNorm
 
@@ -164,9 +164,9 @@ class ESM2(eqx.Module):
 
         self.embedding = nn.Embedding(vocab_size, dim, key=key1)
 
-        self.transformer = eqx.filter_vmap(
-            lambda key: TransformerLayer(dim, num_heads, 4, key=key)
-        )(jr.split(key2, num_layers))
+        self.layers = [
+            TransformerLayer(dim, num_heads, 4, key=key) for key in jr.split(key2, num_layers)
+        ]
 
         # ESM-2 uses tied weights for the language modeling head
         self.lm_head = RobertaLMHead(
@@ -180,13 +180,10 @@ class ESM2(eqx.Module):
     ) -> tuple[Float[Array, "seq vocab"], Float[Array, "seq dim"]]:
         emb = jax.vmap(self.embedding)(tokens)
 
-        dynamic, static = eqx.partition(self.transformer, eqx.is_array)
-
-        def f(_x, _dynamic):
-            layer = eqx.combine(_dynamic, static)
-            return layer(_x, mask), None
-
-        emb, _ = jax.lax.scan(f, emb, dynamic)
+        # Initially used jax.lax.scan for the loop but compilation is still
+        # fast enough and scan may have undesired overhead for GPU jobs.
+        for layer in self.layers:
+            emb = layer(emb, mask)
 
         emb = jax.vmap(self.layer_norm)(emb)
         return self.lm_head(emb), emb
@@ -213,8 +210,8 @@ class ESM2(eqx.Module):
 WEIGHTS_DIR = Path(__file__).parent.parent.parent / "data" / "weights"
 
 
-def build_conversion_map() -> tuple[dict[str, str], dict[str, str]]:
-    single_map = {
+def build_conversion_map(num_layers: int) -> tuple[dict[str, str], dict[str, str]]:
+    conversion_map = {
         "embedding.weight": "esm.embeddings.word_embeddings.weight",
         "lm_head.bias": "lm_head.bias",
         "lm_head.dense.weight": "lm_head.dense.weight",
@@ -225,65 +222,54 @@ def build_conversion_map() -> tuple[dict[str, str], dict[str, str]]:
         "layer_norm.weight": "esm.encoder.emb_layer_norm_after.weight",
         "layer_norm.bias": "esm.encoder.emb_layer_norm_after.bias",
     }
-    multiple_map = {
-        "transformer.attention.query.weight": "esm.encoder.layer.{}.attention.self.query.weight",
-        "transformer.attention.query.bias": "esm.encoder.layer.{}.attention.self.query.bias",
-        "transformer.attention.key.weight": "esm.encoder.layer.{}.attention.self.key.weight",
-        "transformer.attention.key.bias": "esm.encoder.layer.{}.attention.self.key.bias",
-        "transformer.attention.value.weight": "esm.encoder.layer.{}.attention.self.value.weight",
-        "transformer.attention.value.bias": "esm.encoder.layer.{}.attention.self.value.bias",
-        "transformer.attention.output.weight": "esm.encoder.layer.{}.attention.output.dense.weight",
-        "transformer.attention.output.bias": "esm.encoder.layer.{}.attention.output.dense.bias",
-        "transformer.attention.layer_norm.weight": "esm.encoder.layer.{}.attention.LayerNorm.weight",
-        "transformer.attention.layer_norm.bias": "esm.encoder.layer.{}.attention.LayerNorm.bias",
-        "transformer.feed_forward.linear_in.weight": "esm.encoder.layer.{}.intermediate.dense.weight",
-        "transformer.feed_forward.linear_in.bias": "esm.encoder.layer.{}.intermediate.dense.bias",
-        "transformer.feed_forward.linear_out.weight": "esm.encoder.layer.{}.output.dense.weight",
-        "transformer.feed_forward.linear_out.bias": "esm.encoder.layer.{}.output.dense.bias",
-        "transformer.feed_forward.layer_norm.weight": "esm.encoder.layer.{}.LayerNorm.weight",
-        "transformer.feed_forward.layer_norm.bias": "esm.encoder.layer.{}.LayerNorm.bias",
-    }
-
-    return single_map, multiple_map
+    for k in range(num_layers):
+        conversion_map.update(
+            {
+                f"layers.[{k}].attention.query.weight": f"esm.encoder.layer.{k}.attention.self.query.weight",
+                f"layers.[{k}].attention.query.bias": f"esm.encoder.layer.{k}.attention.self.query.bias",
+                f"layers.[{k}].attention.key.weight": f"esm.encoder.layer.{k}.attention.self.key.weight",
+                f"layers.[{k}].attention.key.bias": f"esm.encoder.layer.{k}.attention.self.key.bias",
+                f"layers.[{k}].attention.value.weight": f"esm.encoder.layer.{k}.attention.self.value.weight",
+                f"layers.[{k}].attention.value.bias": f"esm.encoder.layer.{k}.attention.self.value.bias",
+                f"layers.[{k}].attention.output.weight": f"esm.encoder.layer.{k}.attention.output.dense.weight",
+                f"layers.[{k}].attention.output.bias": f"esm.encoder.layer.{k}.attention.output.dense.bias",
+                f"layers.[{k}].attention.layer_norm.weight": f"esm.encoder.layer.{k}.attention.LayerNorm.weight",
+                f"layers.[{k}].attention.layer_norm.bias": f"esm.encoder.layer.{k}.attention.LayerNorm.bias",
+                f"layers.[{k}].feed_forward.linear_in.weight": f"esm.encoder.layer.{k}.intermediate.dense.weight",
+                f"layers.[{k}].feed_forward.linear_in.bias": f"esm.encoder.layer.{k}.intermediate.dense.bias",
+                f"layers.[{k}].feed_forward.linear_out.weight": f"esm.encoder.layer.{k}.output.dense.weight",
+                f"layers.[{k}].feed_forward.linear_out.bias": f"esm.encoder.layer.{k}.output.dense.bias",
+                f"layers.[{k}].feed_forward.layer_norm.weight": f"esm.encoder.layer.{k}.LayerNorm.weight",
+                f"layers.[{k}].feed_forward.layer_norm.bias": f"esm.encoder.layer.{k}.LayerNorm.bias",
+            }
+        )
+    return conversion_map
 
 
 def update_eqx_with_state_dict(
-    module: ESM2,
+    module: eqx.Module,
     state_dict: dict[str, torch.Tensor],
-    single_map: dict[str, str],
-    multiple_map: dict[str, str],
+    conversion_map: dict[str, str],
 ) -> eqx.Module:
     path_vals, treedef = jax.tree.flatten_with_path(module)
-
     updated_path_vals, count = [], 0
-    num_layers = module.transformer.attention.key.weight.shape[0]
-
+    array: jnp.ndarray
     for names, array in path_vals:
         key = ".".join(str(x).strip(".") for x in names)
-        if key in single_map:
-            weights = state_dict[single_map[key]]
+        try:
+            weights = state_dict[conversion_map[key]]
             assert array.shape == weights.shape, f"{array.shape} != {weights.shape} for {key=}"
             updated_path_vals.append((names, jnp.asarray(weights)))
             count += 1
-
-        elif key in multiple_map:
-            weights = torch.stack(
-                [state_dict[multiple_map[key].format(k)] for k in range(num_layers)]
-            )
-            assert array.shape == weights.shape, f"{array.shape} != {weights.shape} for {key=}"
-            updated_path_vals.append((names, jnp.asarray(weights)))
-            count += 1
-
-        else:
+        except KeyError:
             updated_path_vals.append((names, array))
 
     updated_leaves = [v for _, v in updated_path_vals]
     updated_module = jax.tree.unflatten(treedef, updated_leaves)
 
-    if not count == len(single_map) + len(multiple_map):
+    if not count == len(conversion_map):
         raise ValueError(
-            f"Did not find all keys in conversion map {count=}, "
-            f"{len(single_map)+len(multiple_map)=}"
+            f"Did not find all keys in conversion map: {count=}, {len(conversion_map)=}"
         )
     return updated_module
 
@@ -292,22 +278,16 @@ def get_weights_path(name: str) -> Path:
     return WEIGHTS_DIR / f"{name}.eqx"
 
 
-def convert_weights_from_torch(name: str, seed: int = 0) -> None:
+def convert_weights_from_torch(name: str) -> None:
     if name.startswith("facebook"):
         raise ValueError("Remove the leading 'facebook/' from the model's name.")
 
     eqx_path = get_weights_path(name)
     eqx_path.parent.mkdir(parents=True, exist_ok=True)
 
-    print(eqx_path)
-
     state_dict = AutoModelForMaskedLM.from_pretrained("facebook/" + name).state_dict()
-    model = ESM2(**MODEL_HYPERPARAMS[name], key=jr.PRNGKey(seed))
-    single_map, multiple_map = build_conversion_map()
-    updated_model = update_eqx_with_state_dict(
-        module=model,
-        state_dict=state_dict,
-        single_map=single_map,
-        multiple_map=multiple_map,
-    )
+    # The key used to initialize the model is not important
+    model = ESM2(**MODEL_HYPERPARAMS[name], key=jr.PRNGKey(47))
+    conversion_map = build_conversion_map(MODEL_HYPERPARAMS[name]["num_layers"])
+    updated_model = update_eqx_with_state_dict(model, state_dict, conversion_map)
     eqx.tree_serialise_leaves(eqx_path, updated_model)
