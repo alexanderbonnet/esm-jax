@@ -2,7 +2,8 @@ import pathlib
 from typing import Final
 
 import jax.numpy as jnp
-from jaxtyping import Array, Int
+from beartype import beartype
+from jaxtyping import Array, Bool, Int, jaxtyped
 
 
 def _load_vocab() -> dict[str, int]:
@@ -14,6 +15,7 @@ def _load_vocab() -> dict[str, int]:
 VOCAB: Final[dict[str, int]] = _load_vocab()
 
 
+@jaxtyped(typechecker=beartype)
 def tokenize(sequence: str) -> Int[Array, " n"]:
     tokens = (
         [VOCAB["<cls>"]] + [VOCAB.get(char, VOCAB["<unk>"]) for char in sequence] + [VOCAB["<eos>"]]
@@ -21,9 +23,10 @@ def tokenize(sequence: str) -> Int[Array, " n"]:
     return jnp.array(tokens, dtype=jnp.int32)
 
 
+@jaxtyped(typechecker=beartype)
 def pad_and_mask(
     tokens: Int[Array, " n"], pad_length: int = 0
-) -> tuple[Int[Array, " m"], Int[Array, " m"]]:
+) -> tuple[Int[Array, " m"], Bool[Array, " m"]]:
     if pad_length is None:
         pad_length = 0
 

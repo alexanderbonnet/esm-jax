@@ -8,7 +8,8 @@ import jax.numpy as jnp
 import jax.random as jr
 import loguru
 import torch
-from jaxtyping import Array, Float, Int, PRNGKeyArray
+from beartype import beartype
+from jaxtyping import Array, Float, Int, PRNGKeyArray, jaxtyped
 from transformers import AutoModelForMaskedLM
 
 MODEL_HYPERPARAMS: dict[str, dict[str, int]] = {
@@ -21,11 +22,13 @@ MODEL_HYPERPARAMS: dict[str, dict[str, int]] = {
 }
 
 
+@jaxtyped(typechecker=beartype)
 def gelu(x: Float[Array, " ..."]) -> Float[Array, " ..."]:
     """Matches the implementation in the original ESM repo."""
     return x * 0.5 * (1.0 + jax.lax.erf(x / jnp.sqrt(2.0)))
 
 
+@jaxtyped(typechecker=beartype)
 def fixed_pos_embedding(n: int, dim: int) -> tuple[Float[Array, " n dim"], Float[Array, " n dim"]]:
     inv_freq = 1.0 / (10000 ** (jnp.arange(0, dim, 2) / dim))
     frequencies = jnp.einsum("i,j->ij", jnp.arange(n), inv_freq)
@@ -33,17 +36,20 @@ def fixed_pos_embedding(n: int, dim: int) -> tuple[Float[Array, " n dim"], Float
     return jnp.sin(emb), jnp.cos(emb)
 
 
-def rotate_half(x: Float[Array, "head dim"]) -> Float[Array, "head dim"]:
+@jaxtyped(typechecker=beartype)
+def rotate_half(x: Float[Array, "seq head dim"]) -> Float[Array, "seq head dim"]:
     x1, x2 = jnp.split(x, 2, axis=-1)
     return jnp.concat((-x2, x1), axis=-1)
 
 
+@jaxtyped(typechecker=beartype)
 def apply_rotary_pos_emb(
     x: Float[Array, "seq head dim"], sin: Float[Array, "seq dim"], cos: Float[Array, "seq dim"]
 ) -> Float[Array, "seq head dim"]:
     return (x * cos[:, None, :]) + (rotate_half(x) * sin[:, None, :])
 
 
+@jaxtyped(typechecker=beartype)
 class MultiHeadAttention(eqx.Module):
     head_dim: int
 
@@ -83,6 +89,7 @@ class MultiHeadAttention(eqx.Module):
         return jax.vmap(self.output)(out)
 
 
+@jaxtyped(typechecker=beartype)
 class FeedForward(eqx.Module):
     layer_norm: nn.LayerNorm
     linear_in: nn.Linear
@@ -102,6 +109,7 @@ class FeedForward(eqx.Module):
         return jax.vmap(self.linear_out)(x)
 
 
+@jaxtyped(typechecker=beartype)
 class TransformerLayer(eqx.Module):
     attention: MultiHeadAttention
     feed_forward: FeedForward
@@ -120,6 +128,7 @@ class TransformerLayer(eqx.Module):
         return x
 
 
+@jaxtyped(typechecker=beartype)
 class RobertaLMHead(eqx.Module):
     dense: nn.Linear
     layer_norm: nn.LayerNorm
@@ -141,6 +150,7 @@ class RobertaLMHead(eqx.Module):
         return x @ self.weight.T + self.bias
 
 
+@jaxtyped(typechecker=beartype)
 class ESM2(eqx.Module):
     embedding: nn.Embedding
     transformer: TransformerLayer

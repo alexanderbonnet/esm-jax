@@ -5,12 +5,13 @@ description = "Jax implementation of the esm2 protein language model."
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "beartype>=0.22.8",
     "einops>=0.8.1",
     "equinox>=0.13.2",
     "jax>=0.8.0",
     "jaxtyping>=0.3.3",
     "loguru>=0.7.3",
-    "torch>=2.9.1",         # convert weights from torch models
+    "torch>=2.9.1", # convert weights from torch models
     "transformers>=4.57.1", # convert weights from torch models
 ]
 
