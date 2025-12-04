@@ -6,5 +6,5 @@ on:
 name: CI
 
 jobs:
-  lint-type-test:
+  call-reusable-ci:
     uses: ./.github/workflows/reusable-ci.yml
