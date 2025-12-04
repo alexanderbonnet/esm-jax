@@ -10,6 +10,8 @@ Dependencies are managed with `uv`.
 
 ## Example
 
+### ESM2
+
 The model name can be any of the following.
 
 | name                |
@@ -34,6 +36,30 @@ sequence = "MGSSHHHHHHSSGLVPAGSHMEEKQILCVGLVVLDIINVVDKYPEEDTDRRCLSQRWQRGGNASNSCT
 
 tokens = esm2.tokenize(sequence)
 tokens, mask = esm2.pad_and_mask(tokens, pad_length=16) # in case you need to pad or mask
+
+logits, embedding = model(tokens=tokens, mask=mask)
+
+...
+```
+
+### ESMC (Cambrian)
+
+The repo also proposes an implementation of ESM Cambrian. The available models are
+`esmc-300m-2024-12` and `esmc-600m-2024-12`.
+
+The model is used identically to ESM2.
+
+```python
+import jax.random as jr
+
+from esmjax import cambrian
+
+model = cambrian.ESMC.from_pretrained("esm2_t30_150M_UR50D")
+
+sequence = "MGSSHHHHHHSSGLVPAGSHMEEKQILCVGLVVLDIINVVDKYPEEDTDRRCLSQRWQRGGNASNSCTVLSLLGARCAFMGSLAPGHVADFVLDDLRQHSVDLRYVVLQTEGSIPTSTVIINEASGSRTILHAYRNLPDVSAKDFEKVDLTRFKWIHIEGRNASEQVKMLQRIEEHNAKQPLPQKVRVSVEIEKPREELFQLFSYGEVVFVSKDVAKHLGFQSAVEALRGLYSRVKKGATLVCAWAEEGADALGPDGQLLHSDAFPPPRVVDTLGAGDTFNASVIFSLSKGNSMQEALRFGCQVAGKKCGLQGFDGIV"
+
+tokens = cambrian.tokenize(sequence)
+tokens, mask = cambrian.pad_and_mask(tokens, pad_length=16) # in case you need to pad or mask
 
 logits, embedding = model(tokens=tokens, mask=mask)
 
