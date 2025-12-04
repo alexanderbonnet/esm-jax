@@ -158,7 +158,7 @@ class SequenceHead(eqx.Module):
 @jaxtyped(typechecker=beartype)
 class ESMC(eqx.Module):
     embedding: nn.Embedding
-    sequence_head: nn.Sequential
+    sequence_head: SequenceHead
     layer_norm: nn.LayerNorm
     layers: list[TransformerLayer]
 
