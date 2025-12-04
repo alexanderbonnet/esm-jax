@@ -45,7 +45,9 @@ logits, embedding = model(tokens=tokens, mask=mask)
 ### ESMC (Cambrian)
 
 The repo also proposes an implementation of ESM Cambrian. The available models are
-`esmc-300m-2024-12` and `esmc-600m-2024-12`.
+`esmc-300m-2024-12` and `esmc-600m-2024-12`. The weights are downloaded from the
+[hugging face hub](https://github.com/huggingface/huggingface_hub). The
+checkpoints (converted to Jax/Equinox) will be cached in the `data/weights` directory.
 
 The model is used identically to ESM2.
 
