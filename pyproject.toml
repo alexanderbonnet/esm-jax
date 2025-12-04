@@ -1,6 +1,6 @@
 [project]
 name = "esmjax"
-version = "0.1.0-dev1"
+version = "0.1.1"
 description = "Jax implementation of the esm2 protein language model."
 readme = "README.md"
 requires-python = ">=3.13"
