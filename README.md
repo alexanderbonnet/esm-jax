@@ -67,3 +67,31 @@ logits, embedding = model(tokens=tokens, mask=mask)
 
 ...
 ```
+
+## Citations
+
+```bash
+@article{lin2023evolutionary,
+  title = {Evolutionary-scale prediction of atomic-level protein structure with a language model},
+  author = {Zeming Lin and Halil Akin and Roshan Rao and Brian Hie and Zhongkai Zhu and Wenting Lu and Nikita Smetanin and Robert Verkuil and Ori Kabeli and Yaniv Shmueli and Allan dos Santos Costa and Maryam Fazel-Zarandi and Tom Sercu and Salvatore Candido and Alexander Rives},
+  journal = {Science},
+  volume = {379},
+  number = {6637},
+  pages = {1123-1130},
+  year = {2023},
+  doi = {10.1126/science.ade2574},
+  URL = {https://www.science.org/doi/abs/10.1126/science.ade2574},
+  note = {Earlier versions as preprint: bioRxiv 2022.07.20.500902}
+}
+```
+
+```bash
+@misc{esm2024cambrian,
+  author = {{ESM Team}},
+  title = {ESM Cambrian: Revealing the mysteries of proteins with unsupervised learning},
+  year = {2024},
+  publisher = {EvolutionaryScale Website},
+  url = {https://evolutionaryscale.ai/blog/esm-cambrian},
+  urldate = {2024-12-04}
+}
+```
