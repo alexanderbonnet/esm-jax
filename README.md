@@ -1,10 +1,9 @@
 # esm-jax
 
-Jax implementation of the esm2 protein language model, inference only. The outputs
+Jax implementations of the ESM2 and ESMC protein language models (currently for inference only). The outputs
 were verified against the available models on hugging face.
 
-The model differs slightly from the hugging face version as I have removed
-token dropout from inference.
+The ESM2 model differs slightly from the hugging face version as I have removed "token dropout" from inference.
 
 Dependencies are managed with `uv`.
 
